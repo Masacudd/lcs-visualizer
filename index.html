@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LCS Visualizer</title>
+
+<style>
+
+:root{
+  --bg:#0b1020;
+--panel:#121a2b;
+  --stroke:#25304a;
+  --text:#e8ecff;
+  --highlight:#f59e0b;
+  --traceback:#f87171;
+  --match:#22c55e;
+  --muted:#b7c0ff;
+
+  --normal:rgba(106,169,255,0.72);
+  --compare:rgba(255,209,102,0.78);
+  --inactive:rgba(255,255,255,0.10);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+  font-family:Arial;
+  background:var(--bg);
+  color:white;
+
+  display:flex;
+  flex-direction:column;
+
+  height:100%;
+  overflow:hidden; /* 🚨 stops page scrolling */
+}
+
+header{
+  height:70px; /* 🔥 fixed height */
+  flex-shrink:0;
+}
+
+.app-shell{
+  display:flex;
+  flex-direction:row;   /* 🔥 FORCE horizontal */
+  height:calc(100vh - 70px);
+  overflow:hidden;
+}
+
+
+
+
+.control-panel{
+  width:420px;
+  min-width:420px;   /* 🔥 VERY IMPORTANT */
+  max-width:420px;
+
+  background:var(--panel);
+  border-right:1px solid var(--stroke);
+  padding:20px;
+
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+
+  height:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+
+.control-panel::-webkit-scrollbar{
+  display:none;
+}
+
+
+
+
+
+@media(max-width: 980px){
+  .app-shell {
+    flex-direction: column; /* stack panels on small screens */
+    height: auto;
+  }
+
+  .control-panel, .visualization-panel {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    height: auto;
+  }
+}
+
+.visualization-panel {
+  flex: 1;           /* take remaining width */
+  min-width: 0;      /* prevent overflow */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+
+  height: 100%;      /* important */
+  overflow-y: auto;  /* scroll only this panel */
+  overflow-x: hidden;
+}
+
+
+button{
+padding:10px;
+background:#1f2a44;
+border:none;
+color:white;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+background:#2c3a5e;
+}
+
+textarea,input{
+width:100%;
+background:var(--bg);
+color:white;
+border:1px solid var(--stroke);
+border-radius:6px;
+padding:8px;
+}
+
+#graph-stage{
+width:520px;
+height:520px;
+border:1px solid var(--stroke);
+border-radius:6px;
+
+display:block;
+margin:0 auto;   /* هذا يوسّط الجدول */
+}
+
+.pseudo{
+width:520px;
+margin-top:25px;
+background:#141c2e;
+border-radius:10px;
+padding:16px;
+font-family:monospace;
+}
+
+.pseudo-title{
+font-weight:bold;
+margin-bottom:10px;
+font-size:16px;
+text-align:center;
+}
+
+.pseudo-line{
+padding:6px 10px;
+border-left:3px solid transparent;
+position: relative;
+}
+
+.pseudo-line.active{
+  background:#22c55e22;
+  border-left:3px solid #22c55e;
+  font-weight:bold;          
+  transform:scale(1.02);    
+}
+
+.explain {
+    width: 600px;
+    max-width: 100%;
+    margin: 15px auto; 
+    padding: 16px;
+    background: #1f2a44;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.5;
+    border: 1px solid var(--stroke);
+}
+
+.counter-box,.history,.algorithm-box,.legend,.complexity-box{
+border:1px solid var(--stroke);
+padding:10px;
+border-radius:6px;
+background:var(--panel);
+}
+
+.history {
+  flex: 1;         /* grow to fill available space */
+  min-height: 130px; /* optional */
+  max-height: none;  /* let flex control height */
+  overflow-y: auto;
+}
+
+.history div{
+padding:4px 8px;
+border-bottom:1px solid var(--stroke);
+cursor:pointer;
+}
+
+.history div:hover{
+background:#1f2a44;
+}
+table{
+width:100%;
+border-collapse:collapse;
+font-size:13px;
+}
+
+th,td{
+border-bottom:1px solid var(--stroke);
+padding:4px;
+text-align:center;
+}
+
+circle, rect {
+  text-anchor: middle;
+  transition: fill 0.2s ease;
+}
+
+button, .card, .pseudo-line, .history div {
+  transition: all 0.2s ease;
+
+}
+
+.legend {
+    border: 1px solid var(--stroke);
+    padding: 10px;
+    border-radius: 6px;
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    max-width: 220px;
+}
+
+.box{
+display:inline-block;
+width:14px;
+height:14px;
+margin-right:6px;
+border-radius:3px;
+}
+
+.current{background:#f59e0b;}   
+.match{background:#22c55e;}     
+.normal{background:#1f2a44;}    
+.traceback{background:#f87171;} 
+.compare{background:#3b82f6;}   
+
+.examples{
+display:flex;
+gap:8px;
+margin-top:10px;
+flex-wrap:wrap;
+}
+
+.controls-row{
+display:flex;
+gap:8px;
+margin:15px 0;
+}
+
+.controls-row button{
+flex:1;
+padding:10px;
+font-size:14px;
+border-radius:6px;
+}
+
+.lcs-speed{
+margin-top:10px;
+}
+
+.status-cards{
+display:flex;
+gap:10px;
+margin-top:15px;
+}
+
+.card{
+flex:1;
+background:#1f2a44;
+padding:10px;
+border-radius:8px;
+text-align:center;
+font-size:14px;
+}
+
+.legend-horizontal{
+display:flex;
+justify-content:center;
+gap:25px;
+align-items:center;
+margin-bottom:10px;
+font-size:14px;
+}
+
+.legend-horizontal div{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+
+.step-panel{
+display:flex;
+flex-direction:column;
+gap:14px;
+min-width:140px;
+}
+
+.step-card{
+background:#1f2a44;
+padding:12px;
+border-radius:10px;
+text-align:center;
+font-size:14px;
+box-shadow:0 3px 8px rgba(0,0,0,0.35);
+}
+
+.pseudo-line:hover::after{
+  content: attr(data-tooltip);
+  position:absolute;
+  background:#111827;
+  color:#e5e7eb;
+  padding:6px 10px;
+  border-radius:6px;
+  font-size:12px;
+  white-space:nowrap;
+  transform:translateY(-35px);
+  z-index:10;
+}
+
+.legend b{
+  margin-bottom:6px;
+  display:block;
+  color:#b7c0ff;
+}
+
+.algorithm-box{
+width:100%;
+display:block;
+margin-top:10px;
+}
+
+.algorithm-box b{
+display:block;
+margin-bottom:6px;
+color:#b7c0ff;
+}
+.algorithm-box{
+background:#1f2a44;
+padding:12px;
+border-radius:8px;
+border:1px solid var(--stroke);
+}
+.control-panel > *{
+width:100%;
+}
+#overview-content{
+font-size:12px;
+line-height:1.5;
+}
+
+.algorithm-box{
+font-size:12px;
+}
+
+.algorithm-box ul,
+.algorithm-box ol{
+padding-left:18px;
+margin-top:6px;
+}
+.stats-cards{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:10px;
+}
+
+.stats-cards .card{
+background:#1f2a44;
+padding:10px;
+border-radius:8px;
+text-align:center;
+font-size:13px;
+box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+
+.preset-box{
+display:flex;
+flex-direction:column;
+gap:6px;
+margin-top:10px;
+}
+
+.preset-box select{
+background:#1f2a44;
+color:white;
+border:1px solid var(--stroke);
+padding:8px;
+border-radius:6px;
+font-size:13px;
+}
+.trace-button{
+width:100%;
+margin-top:6px;
+padding:12px;
+background:#1f2a44; 
+color:black;
+font-weight:bold;
+border-radius:8px;
+cursor:pointer;
+}
+
+.trace-button:hover{
+background:#1f2a44;
+}
+
+
+
+.line-info-box{
+margin-top:10px;
+padding:10px;
+background:#111827;
+border-left:4px solid #22c55e;
+color:#e5e7eb;
+font-size:13px;
+border-radius:6px;
+}
+
+.table-row {
+  display: flex;
+  justify-content: center; /* center horizontally */
+  align-items: flex-start; /* align to top */
+  gap: 40; /* no gap since there’s no panel */
+}
+
+.complexity-box p {
+    font-size: 12px;
+}
+
+.chart-container{
+  width:100%;
+  height:200px;
+  background:#0f172a;
+  border-radius:10px;
+  margin-top:10px;
+}
+
+.key-box{
+  background:#111827;
+  border-left:4px solid #f59e0b;
+  padding:10px;
+  border-radius:6px;
+  font-size:12px;
+  margin-top:8px;
+}
+
+.warning-box{
+  background:#7f1d1d;
+  padding:10px;
+  border-radius:6px;
+  font-size:12px;
+  margin-top:8px;
+}
+
+.algorithm-box pre {
+    background: rgba(255,255,255,0.05);
+    padding: 8px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12px;
+}
+
+.algorithm-box ul {
+    padding-left: 18px;
+    font-size: 12px;
+}
+
+.algorithm-box li {
+    margin-bottom: 4px;
+}
+
+.code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    overflow-x: auto;
+    line-height: 1.5;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+
+.trace-table {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 12px;
+}
+
+.trace-row {
+    display: grid;
+    grid-template-columns: 40px 30px 30px 1fr;
+    padding: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.trace-header {
+    font-weight: bold;
+    background: rgba(255,255,255,0.08);
+}
+
+
+/* ===== Welcome Screen ===== */
+.welcome-screen{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:linear-gradient(135deg,#0b1020,#1f2a44);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
+}
+
+.welcome-card{
+  background:#121a2b;
+  padding:40px;
+  border-radius:16px;
+  text-align:center;
+  width:420px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.5);
+}
+
+.welcome-card h1{
+  margin-bottom:20px;
+  color:#22c55e;
+}
+
+.intro{
+  font-size:14px;
+  color:#b7c0ff;
+  margin-bottom:15px;
+  line-height:1.6;
+}
+
+.start-btn{
+  margin-top:20px;
+  padding:14px;
+  width:100%;
+  border:none;
+  border-radius:10px;
+  background:#22c55e;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.start-btn:hover{
+  background:#16a34a;
+  transform:scale(1.05);
+}
+
+.main-header{
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  background:#0b1020;   /* no gradient */
+  border-bottom:1px solid var(--stroke);
+}
+
+.main-header h1{
+  font-size:16px;
+  font-weight:500;
+  color:var(--muted);   /* softer color */
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="welcome-screen" class="welcome-screen">
+
+  <div class="welcome-card">
+
+    <h1>🔍 Longest Common Subsequence</h1>
+
+    <p class="intro">
+      Welcome to your interactive LCS Visualizer!  
+      In this session, you will explore how two strings are compared step by step  
+      using <b>Dynamic Programming</b>.
+    </p>
+
+    <p class="intro">
+      You will see how the table is built, how matches are found,  
+      and how the final subsequence is constructed.
+    </p>
+
+    <button id="start-btn" class="start-btn">
+      🚀 Let’s Visualize!
+    </button>
+
+  </div>
+
+</div>
+
+
+
+<div id="visualizer-screen" style="display:none;"></div>
+
+
+<header class="main-header">
+  <div>
+    <h1>Longest Common Subsequence Visualizer</h1>
+  </div>
+</header>
+
+
+
+
+
+<div class="app-shell">
+
+<div class="control-panel">
+
+<label>String X:</label> <input id="stringX" type="text" value="AGGTAB">
+
+<label>String Y:</label> <input id="stringY" type="text" value="GXTXAYB">
+
+<div class="preset-box">
+
+<label>Preset Examples</label>
+
+<select id="preset-select">
+
+<option value="">Select Example</option>
+
+<option value="AGGTAB|GXTXAYB">
+Example 1: AGGTAB vs GXTXAYB
+</option>
+
+<option value="ABCBDAB|BDCABA">
+Example 2: ABCBDAB vs BDCABA
+</option>
+
+<option value="XMJYAUZ|MZJAWXU">
+Example 3: XMJYAUZ vs MZJAWXU
+</option>
+
+<option value="AAAAAA|BBBBBB">
+Worst Case Example
+</option>
+
+</select>
+
+</div>
+
+<div class="controls-row">
+<button id="build-btn">Build Steps</button>
+<button id="step-btn">Step</button>
+<button id="play-btn">Play</button>
+<button id="pause-btn">Pause</button>
+<button id="reset-btn">Reset</button>
+</div>
+<button id="trace-btn" class="trace-button">
+Show LCS 
+</button>
+
+<div class="lcs-speed">
+
+<label>Speed</label>
+
+<input id="speed-slider" type="range" min="0.25" max="4" step="0.25" value="1">
+<div>Speed: <span id="speed-value">1x</span></div>
+
+</div>
+
+<div class="status-cards">
+
+<div class="card">
+<b>Status</b>
+<div id="status">Idle</div>
+</div>
+
+<div class="card">
+<b>Step</b>
+<div id="step-counter">0 / 0</div>
+</div>
+
+<div class="card">
+<b>Speed</b>
+<div id="speed-display">1x</div>
+</div>
+
+</div>
+
+<div class="stats-cards">
+
+<div class="card">
+<b>Comparisons</b>
+<div id="comparisons">0</div>
+</div>
+
+<div class="card">
+<b>Table Updates</b>
+<div id="updates">0</div>
+</div>
+
+<div class="card">
+<b>Matches</b>
+<div id="matches">0</div>
+</div>
+
+<div class="card">
+<b>Traceback</b>
+<div id="traceback">0</div>
+</div>
+
+
+</div>
+<b>History</b>
+<div class="history" id="history"></div>
+
+
+<div class="algorithm-box">
+
+<b>LCS Trace Table</b>
+
+
+<div class="trace-table" id="trace-table"></div>
+
+</div>
+
+
+<div class="algorithm-box">
+<b>Key Concepts</b>
+<ul>
+<li>Dynamic Programming stores results of subproblems.</li>
+<li>The LCS table grows row by row and column by column.</li>
+<li>Traceback reconstructs the subsequence.</li>
+</ul>
+</div>
+
+
+<div class="algorithm-box">
+
+<button onclick="toggleOverview()">Algorithm Overview ▼</button>
+
+
+<div id="overview-content" style="display:none; margin-top:10px">
+
+<b>Core Idea</b>
+
+<p>
+The Longest Common Subsequence (LCS) problem finds the longest sequence of characters
+that appears in both strings in the same order, but not necessarily consecutively.
+The algorithm uses <b>Dynamic Programming</b> to store partial solutions and avoid
+recomputing the same subproblems.
+</p>
+
+<p>
+Each cell in the table represents the length of the LCS for prefixes of the two strings.
+By filling the table step-by-step we compute the final solution.
+</p>
+
+<br>
+
+<b>How It Works (Step by Step)</b>
+
+<ol>
+
+<li>Create table L with size (m+1) × (n+1)</li>
+<li>Initialize first row and column with 0</li>
+<li>Fill the table row by row</li>
+<li>Compare characters X[i-1] and Y[j-1]</li>
+<li>If equal → L[i][j] = L[i-1][j-1] + 1</li>
+<li>If different → L[i][j] = max(L[i-1][j], L[i][j-1])</li>
+<li>Continue until the table is filled</li>
+<li>The value L[m][n] is the length of the LCS</li>
+<li>Traceback from bottom-right to reconstruct the subsequence</li>
+
+</ol>
+
+<br>
+
+<b>Complexity</b>
+
+<p>
+Worst / Average: <b>O(m × n)</b>  |  
+Best (very small common prefixes): <b>O(m × n)</b>  |  
+Space: <b>O(m × n)</b>  |  
+Stable: ✅ Yes
+</p>
+
+<br>
+
+<b>When to Use</b>
+
+<ul>
+<li>DNA sequence comparison</li>
+<li>Version control diff tools</li>
+<li>Plagiarism detection</li>
+<li>Text similarity analysis</li>
+</ul>
+
+</div>
+
+</div>
+<div class="algorithm-box">
+
+<button onclick="togglePythonCode()">Python LCS Code ▼</button>
+
+<div id="python-code-content" style="display:none; margin-top:10px">
+
+<pre class="code-block">
+def LCS(X, Y):
+    m = len(X)
+    n = len(Y)
+
+    # Step 1: Create DP table
+    L = [[0] * (n + 1) for _ in range(m + 1)]
+
+    # Step 2: Fill the table
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if X[i - 1] == Y[j - 1]:
+                L[i][j] = L[i - 1][j - 1] + 1
+            else:
+                L[i][j] = max(L[i - 1][j], L[i][j - 1])
+
+    # Step 3: Traceback to get LCS string
+    i = m
+    j = n
+    lcs = []
+
+    while i > 0 and j > 0:
+        if X[i - 1] == Y[j - 1]:
+            lcs.append(X[i - 1])
+            i -= 1
+            j -= 1
+        elif L[i - 1][j] > L[i][j - 1]:
+            i -= 1
+        else:
+            j -= 1
+
+    lcs.reverse()
+
+    return L[m][n], "".join(lcs)
+</pre>
+
+</div>
+
+</div>
+
+
+<div class="algorithm-box">
+
+<button onclick="toggleVisualization()">Visualization Guide ▼</button>
+
+<div id="visualization-content" style="display:none; margin-top:10px">
+
+<b>What You Are Seeing</b>
+
+<ul>
+<li><b>Table:</b> Represents LCS values for prefixes of X and Y.</li>
+<li><b>Rows:</b> Characters of string X</li>
+<li><b>Columns:</b> Characters of string Y</li>
+</ul>
+
+<br>
+
+<b>Cell Colors</b>
+
+<ul>
+<li style="color:#22c55e;"><b>Green:</b> Characters match (diagonal move)</li>
+<li style="color:#f59e0b;"><b>Orange:</b> No match (take max of top/left)</li>
+<li><b>Dark cells:</b> Normal computed values</li>
+<li style="color:#ef4444;"><b>Red border:</b> Traceback path (building LCS)</li>
+</ul>
+
+<br>
+
+<b>Arrows Meaning</b>
+
+<ul>
+<li><b>↖ (Diagonal):</b> Match found → extend subsequence</li>
+<li><b>↑ (Up):</b> Take value from above</li>
+<li><b>← (Left):</b> Take value from left</li>
+</ul>
+
+<br>
+
+<b>How to Read the Visualization</b>
+
+<ol>
+<li>Start from top-left and fill the table step by step</li>
+<li>Each cell compares characters from X and Y</li>
+<li>Green cells indicate matches</li>
+<li>Final answer is in the bottom-right cell</li>
+<li>Traceback shows how the LCS string is formed</li>
+</ol>
+
+</div>
+
+</div>
+
+<div class="complexity-box">
+
+<b>Complexity Growth</b>
+
+<p>
+This graph compares how the running time grows as the input size increases.
+</p>
+
+<ul>
+<li><b style="color:#22c55e;">Dynamic Programming (O(m x n))</b>: grows slowly and efficiently.</li>
+<li><b style="color:#f87171;">Brute Force (O(2ⁿ))</b>: grows extremely fast and becomes impractical.</li>
+</ul>
+
+<p>
+As the input size increases, the gap between the two approaches becomes very large,
+showing why Dynamic Programming is preferred for solving the LCS problem.
+</p>
+
+<label>Input Size (n)</label>
+<input type="range" id="size-slider" min="2" max="15" value="5">
+<div>n = <span id="size-value">5</span></div>
+<svg id="complexity-graph" width="320" height="200"></svg>
+
+<div class="warning-box">
+<b>Why Brute Force is Inefficient</b><br>
+Brute force generates all possible subsequences of a string (2ⁿ possibilities).
+Each subsequence must then be checked against the second string,
+which makes the algorithm extremely slow for large inputs.
+</div>
+</div>
+
+
+
+
+
+<div class="algorithm-box">
+
+<b>Worked Example</b>
+
+<p>Run the example step-by-step.</p>
+
+<button onclick="runWorkedExample()">
+Run Example
+</button>
+
+</div>
+
+</div>  
+
+<div class="visualization-panel">
+
+  <!-- Legend stays at the top -->
+  <div class="legend-horizontal">
+    <b>Legend</b>
+    <div><span class="box current"></span> Current Cell</div>
+    <div><span class="box match"></span> Character Match</div>
+    <div><span class="box normal"></span> Normal Cell</div>
+    <div><span class="box traceback"></span> Traceback Path</div>
+  </div>
+
+  
+<div class="table-row">
+  <svg id="graph-stage" width="520" height="520"></svg>
+</div>
+
+
+
+
+<div class="pseudo">
+
+<div class="pseudo-title">LCS Algorithm</div>
+
+<div class="pseudo-line" id="p1" data-tooltip="Loop through all characters of string X">
+for i = 1 → m
+</div>
+
+<div class="pseudo-line" id="p2" data-tooltip="Loop through all characters of string Y">
+  for j = 1 → n
+</div>
+
+<div class="pseudo-line" id="p3" data-tooltip="Check if the characters at position i-1 and j-1 match">
+    if X[i−1] == Y[j−1]
+</div>
+
+<div class="pseudo-line" id="p4" data-tooltip="If characters match, extend the subsequence by 1 from the diagonal cell">
+       L[i][j] = L[i−1][j−1] + 1
+</div>
+
+<div class="pseudo-line" id="p5" data-tooltip="If characters do not match">
+    else
+</div>
+
+<div class="pseudo-line" id="p6" data-tooltip="Take the maximum value from top or left cell">
+       L[i][j] = max(L[i−1][j], L[i][j−1])
+</div>
+
+<div class="pseudo-line" data-tooltip="After table is filled, follow arrows backward to find the LCS">
+Traceback from L[m][n]
+</div>
+
+</div>
+
+
+<div class="explain" id="explain">
+Step explanation will appear here
+</div>
+<div id="line-info" class="line-info-box">
+📖 Line explanation will appear here
+</div>
+
+</div>
+
+</div>
+</div>
+</body>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    // ===== Global State =====
+    let steps = [];
+    let stepIndex = 0;
+    let timer = null;
+    let comparisons = 0;
+    let updates = 0;
+    let matches = 0;
+    let traceback = 0;
+
+    // ===== Element References =====
+    const stage = document.getElementById("graph-stage");
+    const historyBox = document.getElementById("history");
+    const statusEl = document.getElementById("status");
+    const stepCounterEl = document.getElementById("step-counter");
+    const explainBox = document.getElementById("explain");
+    const comparisonsEl = document.getElementById("comparisons");
+    const updatesEl = document.getElementById("updates");
+    const matchesEl = document.getElementById("matches");
+    const tracebackEl = document.getElementById("traceback");
+    const speedSlider = document.getElementById("speed-slider");
+
+    console.log(stage, historyBox, statusEl, stepCounterEl); // should show DOM elements
+
+function buildSteps() {
+    statusEl.innerText = "Ready";
+
+    comparisons = 0;
+    updates = 0;
+    matches = 0;
+    traceback = 0;
+
+    const X = document.getElementById("stringX").value;
+    const Y = document.getElementById("stringY").value;
+
+    const m = X.length;
+    const n = Y.length;
+
+    steps = [];
+    stepIndex = 0;
+
+    const traceTable = document.getElementById("trace-table");
+
+traceTable.innerHTML = `
+<div class="trace-row trace-header">
+<div>#</div>
+<div>i</div>
+<div>j</div>
+<div>Action</div>
+</div>
+`;
+
+    const L = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            let step = { i, j, L: [], arrow: "", match: false };
+
+            // Increment comparisons and updates
+            comparisons++;
+            updates++;
+
+            // Check for match
+            if (X[i - 1] === Y[j - 1]) {
+                matches++;
+                L[i][j] = L[i - 1][j - 1] + 1;
+                step.match = true;
+                step.arrow = "↖";
+            } else {
+                if (L[i - 1][j] >= L[i][j - 1]) {
+                    L[i][j] = L[i - 1][j];
+                    step.arrow = "↑";
+                } else {
+                    L[i][j] = L[i][j - 1];
+                    step.arrow = "←";
+                }
+            }
+
+            // Save counters in the step
+            step.comparisons = comparisons;
+            step.updates = updates;
+            step.matches = matches;
+
+            // Save a copy of the table
+            step.L = L.map(row => row.slice());
+            steps.push(step);
+        }
+    }
+
+    // Reset to first step
+    stepIndex = 0;
+    historyBox.innerHTML = "";
+
+    // Build history panel
+    
+
+    // Render the first step
+    renderStep();
+    tracebackEl.innerText = "0";
+    stepCounterEl.innerText = `1 / ${steps.length}`;
+}
+// ===== Render Step =====
+function renderStep() {
+    if (steps.length === 0) return;
+
+    const step = steps[stepIndex];
+    const X = document.getElementById("stringX").value;
+    const Y = document.getElementById("stringY").value;
+
+    const m = step.L.length - 1;
+    const n = step.L[0].length - 1;
+
+    const cellSize = 40;
+    const svgSize = 520;
+    const offsetX = (svgSize - (n + 1) * cellSize) / 2;
+    const offsetY = (svgSize - (m + 1) * cellSize) / 2;
+
+    // Clear previous table
+    stage.innerHTML = "";
+
+    for (let i = 0; i <= m; i++) {
+        for (let j = 0; j <= n; j++) {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("x", offsetX + j * cellSize);
+            rect.setAttribute("y", offsetY + i * cellSize);
+            rect.setAttribute("width", cellSize);
+            rect.setAttribute("height", cellSize);
+            rect.setAttribute("stroke", "#25304a");
+
+            let fillColor = "#1f2a44"; // default
+
+            // highlight previous matches
+            // highlight previous matches
+if (i > 0 && j > 0 && step.L[i][j] > 0 && X[i - 1] === Y[j - 1]) {
+    fillColor = "#22c55e";
+}
+
+
+            // current step cell
+           if (i === step.i && j === step.j) {
+    fillColor = step.match ? "#22c55e" : "#f59e0b";
+}
+
+            rect.setAttribute("fill", fillColor);
+            stage.appendChild(rect);
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", offsetX + j * cellSize + cellSize / 2);
+            text.setAttribute("y", offsetY + i * cellSize + cellSize / 2 + 5);
+            text.setAttribute("fill", "white");
+            text.setAttribute("dominant-baseline", "middle");
+            text.setAttribute("font-size", "14");
+
+          if (i === 0 && j === 0) {
+    text.textContent = "0";
+}
+else if (i === 0) {
+    text.textContent = "0";  // first row zeros
+}
+else if (j === 0) {
+    text.textContent = "0";  // first column zeros
+}
+else {
+    text.textContent = step.L[i][j];
+}
+            stage.appendChild(text);
+
+            // arrow for current step
+            if (i === step.i && j === step.j && step.arrow) {
+                const arrow = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                arrow.setAttribute("x", offsetX + j * cellSize + cellSize / 2);
+                arrow.setAttribute("y", offsetY + i * cellSize + cellSize / 2 + 15);
+                arrow.setAttribute("fill", "#ff4444");
+                arrow.setAttribute("font-size", "18");
+                arrow.setAttribute("font-weight", "bold");
+                arrow.setAttribute("text-anchor", "middle");
+                arrow.textContent = step.arrow;
+                stage.appendChild(arrow);
+            }
+        }
+    }
+
+    // Top labels (Y)
+for (let j = 1; j <= Y.length; j++) {
+    let label = document.createElementNS("http://www.w3.org/2000/svg","text");
+    label.setAttribute("x", offsetX + j * cellSize + cellSize/2);
+    label.setAttribute("y", offsetY - 10);
+    label.setAttribute("fill","white");
+    label.setAttribute("text-anchor","middle");
+    label.textContent = Y[j-1];
+    stage.appendChild(label);
+}
+
+// Left labels (X)
+for (let i = 1; i <= X.length; i++) {
+    let label = document.createElementNS("http://www.w3.org/2000/svg","text");
+    label.setAttribute("x", offsetX - 10);
+    label.setAttribute("y", offsetY + i * cellSize + cellSize/2);
+    label.setAttribute("fill","white");
+    label.setAttribute("text-anchor","end");
+    label.textContent = X[i-1];
+    stage.appendChild(label);
+}
+
+    // Pseudo-code highlight
+    document.querySelectorAll(".pseudo-line").forEach(l => l.classList.remove("active"));
+    if (step.match) document.getElementById("p4").classList.add("active");
+    else document.getElementById("p6").classList.add("active");
+
+    // Explanation
+   // Explanation with search info
+explainBox.innerText = step.match
+    ? `🔍 Comparing X[${step.i-1}] = '${X[step.i-1]}' with Y[${step.j-1}] = '${Y[step.j-1]}' → Match, extend LCS.`
+    : `🔍 Comparing X[${step.i-1}] = '${X[step.i-1]}' with Y[${step.j-1}] = '${Y[step.j-1]}' → No match, take max(top/left).`;
+    const lineBox = document.getElementById("line-info");
+    lineBox.innerText = step.match
+        ? "📖 Line 4 : Characters match, add 1 from diagonal."
+        : "📖 Line 6: Characters do not match, take max from top/left.";
+
+    // Step Counter
+    stepCounterEl.innerText = `${stepIndex + 1} / ${steps.length}`;
+// Highlight history
+[...historyBox.children].forEach(el => el.style.background = "transparent");
+if (historyBox.children[stepIndex]) {
+    historyBox.children[stepIndex].style.background = "#1e293b";
+}
+
+// Highlight trace table
+const traceTable = document.getElementById("trace-table");
+[...traceTable.children].forEach((el, idx) => {
+    if (idx === stepIndex + 1) el.style.background = "#1e293b";
+    else el.style.background = "transparent";
+});
+
+if (!traceTable.children[stepIndex + 1]) {
+
+    const row = document.createElement("div");
+    row.className = "trace-row";
+
+    const action = step.match
+        ? "Match → Diagonal"
+        : "No match → Max(top/left)";
+
+    row.innerHTML = `
+        <div>${stepIndex + 1}</div>
+        <div>${step.i}</div>
+        <div>${step.j}</div>
+        <div>${action}</div>
+    `;
+
+    traceTable.appendChild(row);
+}
+
+    // ===== Update Counters =====
+    comparisonsEl.innerText = step.comparisons;
+    updatesEl.innerText = step.updates;
+    matchesEl.innerText = step.matches;
+
+    // ===== Update History Step-by-Step =====
+if (!historyBox.children[stepIndex]) {
+    const step = steps[stepIndex];
+
+    const div = document.createElement("div");
+    div.style.color = step.match ? "#22c55e" : "#f59e0b";
+
+    div.textContent = `Step ${stepIndex + 1}: compare X[${step.i - 1}] and Y[${step.j - 1}]`;
+
+    div.dataset.step = stepIndex;
+
+    div.onclick = () => {
+        stepIndex = parseInt(div.dataset.step);
+        renderStep();
+    };
+
+    historyBox.appendChild(div);
+}
+}   
+
+
+
+
+    // ===== Step Forward =====
+    function stepForward() {
+        if (stepIndex < steps.length - 1) {
+            stepIndex++;
+            renderStep();
+        }
+    }
+
+    // ===== Play / Pause =====
+    function play() {
+    if (!steps.length) return;
+
+    statusEl.innerText = "Playing";
+
+    if (timer) clearInterval(timer);
+
+    function run() {
+        if (stepIndex >= steps.length - 1) {
+            clearInterval(timer);
+            timer = null;
+            statusEl.innerText = "Done";
+            return;
+        }
+
+        stepForward();
+
+        // 🔥 dynamically adjust speed EACH step
+        const speed = parseFloat(speedSlider.value);
+        timer = setTimeout(run, 500 / speed);
+    }
+
+    run();
+}
+
+    function pause() {
+        clearInterval(timer);
+        timer = null;
+        statusEl.innerText = "Paused";
+    }
+
+    // ===== Reset =====
+    function reset() {
+        statusEl.innerText = "Idle";
+        stepIndex = 0;
+        steps = [];
+        stage.innerHTML = "";
+        explainBox.innerText = "";
+        comparisonsEl.innerText = "0";
+        updatesEl.innerText = "0";
+        matchesEl.innerText = "0";
+        tracebackEl.innerText = "0";
+        stepCounterEl.innerText = "0 / 0";
+        historyBox.innerHTML = "";
+    }
+
+    // ===== Traceback LCS =====
+    async function showLCS() {
+        if (!steps.length) return;
+
+        statusEl.innerText = "Traceback";
+
+        const lastStep = steps[steps.length - 1];
+        const L = lastStep.L;
+        const X = document.getElementById("stringX").value;
+        const Y = document.getElementById("stringY").value;
+        let i = X.length;
+        let j = Y.length;
+        let lcs = "";
+        const cellSize = 40;
+        const svgSize = 520;
+        const offsetX = (svgSize - (Y.length + 1) * cellSize) / 2;
+        const offsetY = (svgSize - (X.length + 1) * cellSize) / 2;
+        traceback = 0;
+        tracebackEl.innerText = traceback;
+
+        while (i > 0 && j > 0) {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+            rect.setAttribute("x", offsetX + j * cellSize);
+            rect.setAttribute("y", offsetY + i * cellSize);
+            rect.setAttribute("width", cellSize);
+            rect.setAttribute("height", cellSize);
+            rect.setAttribute("fill", "none");
+            rect.setAttribute("stroke", "#ef4444"); 
+            rect.setAttribute("stroke-width", "3");
+            stage.appendChild(rect);
+
+            await new Promise(r => setTimeout(r, 500 / speedSlider.value));
+
+            if (X[i - 1] === Y[j - 1]) {
+                lcs = X[i - 1] + lcs;
+                i--; j--;
+            } else if (L[i - 1][j] >= L[i][j - 1]) i--;
+            else j--;
+
+            traceback++;
+            tracebackEl.innerText = traceback;
+        }
+
+        explainBox.innerText = lcs ? `LCS = ${lcs}` : "No Common Subsequence Found";
+    }
+
+    function loadExample(x, y) {
+        document.getElementById("stringX").value = x;
+        document.getElementById("stringY").value = y;
+    }
+
+    function drawComplexityGraph() {
+    const svg = document.getElementById("complexity-graph");
+    if (!svg) return;
+
+    svg.innerHTML = "";
+
+    const scaleX = 25;
+    const scaleY = 0.5; 
+
+const n = parseInt(document.getElementById("size-slider").value);
+
+for (let x = 0; x <= n; x++) {
+        const dpValue = x * x;              
+        const bruteValue = Math.pow(2, x);  
+
+        const yDP = 180 - dpValue * scaleY;
+        const yBrute = 180 - bruteValue * 0.05;
+
+        const dp = document.createElementNS("http://www.w3.org/2000/svg","circle");
+        dp.setAttribute("cx", 30 + x * scaleX);
+        dp.setAttribute("cy", yDP);
+        dp.setAttribute("r", 4);
+        dp.setAttribute("fill", "#22c55e");
+        svg.appendChild(dp);
+
+        const brute = document.createElementNS("http://www.w3.org/2000/svg","circle");
+        brute.setAttribute("cx", 30 + x * scaleX);
+        brute.setAttribute("cy", yBrute);
+        brute.setAttribute("r", 4);
+        brute.setAttribute("fill", "#f87171");
+        svg.appendChild(brute);
+    }
+    
+}  
+
+function toggleOverview() {
+    const box = document.getElementById("overview-content");
+    if (!box) {
+        console.warn("Overview content element not found!");
+        return;
+    }
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block"; 
+    } else {
+        box.style.display = "none";  
+    }
+}
+
+window.toggleOverview = toggleOverview;
+
+
+function toggleLCSAlgo() {
+    const box = document.getElementById("lcs-algo-content");
+
+    if (!box) return;
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+}
+
+window.toggleLCSAlgo = toggleLCSAlgo;
+
+
+
+function togglePythonCode() {
+    const box = document.getElementById("python-code-content");
+
+    if (!box) return;
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+}
+
+window.togglePythonCode = togglePythonCode;
+
+
+
+
+function toggleVisualization() {
+    const box = document.getElementById("visualization-content");
+
+    if (!box) return;
+
+    if (box.style.display === "none" || box.style.display === "") {
+        box.style.display = "block";
+    } else {
+        box.style.display = "none";
+    }
+}
+
+window.toggleVisualization = toggleVisualization;
+
+
+function runWorkedExample() {
+    document.getElementById("welcome-screen").style.display = "none";
+    document.getElementById("visualizer-screen").style.display = "block";
+
+    loadExample("AGGTAB","GXTXAYB");
+
+    reset();               
+    buildSteps();          
+    stepIndex = 0;         
+    renderStep();          
+
+    play();
+}
+
+
+    
+
+    document.getElementById("build-btn").onclick = buildSteps;
+    document.getElementById("step-btn").onclick = stepForward;
+    document.getElementById("play-btn").onclick = play;
+    document.getElementById("pause-btn").onclick = pause;
+    document.getElementById("reset-btn").onclick = reset;
+    document.getElementById("trace-btn").onclick = showLCS;
+
+speedSlider.addEventListener("input", function() {
+    document.getElementById("speed-value").innerText = this.value + "x";
+    document.getElementById("speed-display").innerText = this.value + "x";
+});
+
+    document.getElementById("preset-select").addEventListener("change", function() {
+        const val = this.value;
+        if (!val) return;
+        const parts = val.split("|");
+        loadExample(parts[0], parts[1]);
+    });
+
+drawComplexityGraph();
+
+
+const sizeSlider = document.getElementById("size-slider");
+
+if (sizeSlider) {
+    sizeSlider.addEventListener("input", function () {
+    document.getElementById("size-value").innerText = this.value;
+    drawComplexityGraph(); 
+});
+}
+
+
+});
+
+
+document.getElementById("start-btn").onclick = function () {
+    document.getElementById("welcome-screen").style.display = "none";
+    document.getElementById("visualizer-screen").style.display = "block";
+};
+
+</script>
